@@ -29,11 +29,14 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  referredBy User?  @relation("Referral", fields: [referredById], references: [id])
-  referrals  User[] @relation("Referral")
+  referredBy   User?         @relation("Referral", fields: [referredById], references: [id])
+  referrals    User[]        @relation("Referral")
+  organization Organization?
 
+  orders  Order[]
   points  Point[]
   coupons Coupon[]
+  reviews Review[]
 
   @@map("users")
 }
@@ -43,10 +46,10 @@ model Point {
   userId    Int      @map("user_id")
   orderId   Int?     @map("order_id")
   amount    Int
-  createdAt DateTime @default(now()) @map("created_at")
   expiresAt DateTime @map("expires_at")
 
-  user User @relation(fields: [userId], references: [id])
+  user  User   @relation(fields: [userId], references: [id])
+  order Order? @relation(fields: [orderId], references: [id])
 
   @@map("points")
 }
@@ -60,7 +63,109 @@ model Coupon {
   createdAt     DateTime @default(now()) @map("created_at")
   expiresAt     DateTime @map("expires_at")
 
-  user User @relation(fields: [userId], references: [id])
+  user   User    @relation(fields: [userId], references: [id])
+  orders Order[]
 
   @@map("coupons")
+}
+
+model Order {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @map("user_id")
+  eventId         Int       @map("event_id")
+  ticketId        Int       @map("ticket_id")
+  pointsUsed      Int?      @map("points_used")
+  couponId        Int?      @map("coupon_id")
+  paymentStatus   String    @map("payment_status")
+  paymentProofUrl String?   @map("payment_proof_url")
+  paymentMethod   String    @map("payment_method")
+  quantity        Int
+  total           Int
+  paidAt          DateTime? @map("paid_at")
+
+  user    User     @relation(fields: [userId], references: [id])
+  event   Event    @relation(fields: [eventId], references: [id])
+  ticket  Ticket   @relation(fields: [ticketId], references: [id])
+  coupon  Coupon?  @relation(fields: [couponId], references: [id])
+  points  Point[]
+  reviews Review[]
+
+  @@map("orders")
+}
+
+model Organization {
+  id                  Int     @id @default(autoincrement())
+  userId              Int     @unique @map("user_id")
+  organizationName    String  @map("organization_name")
+  organizationProfile String? @map("organization_profile")
+  description         String?
+  field               String?
+
+  user   User    @relation(fields: [userId], references: [id])
+  events Event[]
+
+  @@map("organizations")
+}
+
+model Category {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+
+  events Event[]
+
+  @@map("categories")
+}
+
+model Event {
+  id             Int      @id @default(autoincrement())
+  categoryId     Int      @map("category_id")
+  organizationId Int      @map("organization_id")
+  name           String
+  description    String?
+  city           String
+  type           String
+  status         String
+  slug           String
+  image          String?
+  startDate      DateTime @map("start_date")
+  endDate        DateTime @map("end_date")
+
+  category     Category     @relation(fields: [categoryId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  orders       Order[]
+  tickets      Ticket[]
+  reviews      Review[]
+
+  @@map("events")
+}
+
+model Ticket {
+  id       Int    @id @default(autoincrement())
+  eventId  Int    @map("event_id")
+  name     String
+  price    Int
+  quantity Int
+
+  event  Event   @relation(fields: [eventId], references: [id])
+  orders Order[]
+
+  @@map("tickets")
+}
+
+model Review {
+  id      Int    @id @default(autoincrement())
+  eventId Int    @map("event_id")
+  userId  Int    @map("user_id")
+  rating  Int
+  title   String
+  comment String
+  type    String
+  orderId Int    @map("order_id")
+
+  event Event @relation(fields: [eventId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("reviews")
 }
