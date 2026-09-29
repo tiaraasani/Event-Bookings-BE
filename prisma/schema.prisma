@@ -23,6 +23,17 @@ enum PaymentStatus {
   PAID
   REJECTED
   EXPIRED
+  CANCELED
+}
+
+enum EventType {
+  VENUE
+  ONLINE
+}
+
+enum ReviewType {
+  EVENT
+  ORGANIZER
 }
 
 model User {
@@ -44,7 +55,6 @@ model User {
   orders  Order[]
   points  Point[]
   coupons Coupon[]
-  reviews Review[]
 
   @@map("users")
 }
@@ -81,37 +91,38 @@ model Coupon {
 model Order {
   id              Int           @id @default(autoincrement())
   userId          Int           @map("user_id")
-  eventId         Int           @map("event_id")
   ticketId        Int           @map("ticket_id")
-  pointsUsed      Int?          @map("points_used")
+  pointsUsed      Int           @default(0) @map("points_used")
   couponId        Int?          @map("coupon_id")
-  paymentStatus   PaymentStatus
+  paymentStatus   PaymentStatus @default(WAITING_FOR_PAYMENT) @map("payment_status")
   paymentProofUrl String?       @map("payment_proof_url")
-  paymentMethod   String        @map("payment_method")
   quantity        Int
   total           Int
   paidAt          DateTime?     @map("paid_at")
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
   expiresAt       DateTime?     @map("expires_at")
+  voucherId       Int?          @map("voucher_id")
+  discount        Int           @default(0)
+  finalPrice      Int           @map("final_price")
 
   user    User     @relation(fields: [userId], references: [id])
-  event   Event    @relation(fields: [eventId], references: [id])
   ticket  Ticket   @relation(fields: [ticketId], references: [id])
   coupon  Coupon?  @relation(fields: [couponId], references: [id])
   points  Point[]
   reviews Review[]
+  voucher Voucher? @relation(fields: [voucherId], references: [id])
 
   @@map("orders")
 }
 
 model Organization {
-  id                  Int     @id @default(autoincrement())
-  userId              Int     @unique @map("user_id")
-  organizationName    String  @map("organization_name")
-  organizationProfile String? @map("organization_profile")
-  description         String?
-  field               String?
+  id          Int     @id @default(autoincrement())
+  userId      Int     @unique @map("user_id")
+  name        String
+  logo        String?
+  description String?
+  field       String?
 
   user   User    @relation(fields: [userId], references: [id])
   events Event[]
@@ -121,7 +132,7 @@ model Organization {
 
 model Category {
   id          Int     @id @default(autoincrement())
-  name        String
+  name        String  @unique
   description String?
 
   events Event[]
@@ -130,24 +141,24 @@ model Category {
 }
 
 model Event {
-  id             Int      @id @default(autoincrement())
-  categoryId     Int      @map("category_id")
-  organizationId Int      @map("organization_id")
+  id             Int       @id @default(autoincrement())
+  categoryId     Int       @map("category_id")
+  organizationId Int       @map("organization_id")
   name           String
   description    String?
   city           String
-  type           String
-  status         String
-  slug           String
+  type           EventType @default(VENUE)
+  slug           String    @unique
   image          String?
-  startDate      DateTime @map("start_date")
-  endDate        DateTime @map("end_date")
+  startDate      DateTime  @map("start_date")
+  endDate        DateTime  @map("end_date")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   category     Category     @relation(fields: [categoryId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
-  orders       Order[]
   tickets      Ticket[]
-  reviews      Review[]
+  vouchers     Voucher[]
 
   @@map("events")
 }
@@ -167,18 +178,32 @@ model Ticket {
 }
 
 model Review {
-  id      Int    @id @default(autoincrement())
-  eventId Int    @map("event_id")
-  userId  Int    @map("user_id")
-  rating  Int
-  title   String
-  comment String
-  type    String
-  orderId Int    @map("order_id")
+  id        Int        @id @default(autoincrement())
+  rating    Int
+  title     String
+  comment   String
+  type      ReviewType
+  orderId   Int        @map("order_id")
+  createdAt DateTime   @default(now()) @map("created_at")
 
-  event Event @relation(fields: [eventId], references: [id])
-  user  User  @relation(fields: [userId], references: [id])
   order Order @relation(fields: [orderId], references: [id])
 
+  @@unique([orderId, type])
   @@map("reviews")
+}
+
+model Voucher {
+  id            Int      @id @default(autoincrement())
+  eventId       Int      @map("event_id")
+  code          String   @unique
+  discountValue Int      @map("discount_value")
+  quota         Int
+  startDate     DateTime @map("start_date")
+  endDate       DateTime @map("end_date")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  event  Event   @relation(fields: [eventId], references: [id])
+  orders Order[]
+
+  @@map("vouchers")
 }
