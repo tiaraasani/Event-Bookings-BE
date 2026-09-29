@@ -11,3 +11,56 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum Role {
+  CUSTOMER
+  ORGANIZER
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  password     String
+  role         Role     @default(CUSTOMER)
+  picture      String?
+  referralCode String   @unique @map("referral_code")
+  referredById Int?     @map("referred_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  referredBy User?  @relation("Referral", fields: [referredById], references: [id])
+  referrals  User[] @relation("Referral")
+
+  points  Point[]
+  coupons Coupon[]
+
+  @@map("users")
+}
+
+model Point {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  orderId   Int?     @map("order_id")
+  amount    Int
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("points")
+}
+
+model Coupon {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  code          String   @unique
+  discountValue Int      @map("discount_value")
+  isUsed        Boolean  @default(false) @map("is_used")
+  createdAt     DateTime @default(now()) @map("created_at")
+  expiresAt     DateTime @map("expires_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("coupons")
+}
