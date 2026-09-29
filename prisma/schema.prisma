@@ -17,6 +17,14 @@ enum Role {
   ORGANIZER
 }
 
+enum PaymentStatus {
+  WAITING_FOR_PAYMENT
+  WAITING_FOR_CONFIRMATION
+  PAID
+  REJECTED
+  EXPIRED
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   name         String
@@ -47,6 +55,7 @@ model Point {
   orderId   Int?     @map("order_id")
   amount    Int
   expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   user  User   @relation(fields: [userId], references: [id])
   order Order? @relation(fields: [orderId], references: [id])
@@ -70,18 +79,21 @@ model Coupon {
 }
 
 model Order {
-  id              Int       @id @default(autoincrement())
-  userId          Int       @map("user_id")
-  eventId         Int       @map("event_id")
-  ticketId        Int       @map("ticket_id")
-  pointsUsed      Int?      @map("points_used")
-  couponId        Int?      @map("coupon_id")
-  paymentStatus   String    @map("payment_status")
-  paymentProofUrl String?   @map("payment_proof_url")
-  paymentMethod   String    @map("payment_method")
+  id              Int           @id @default(autoincrement())
+  userId          Int           @map("user_id")
+  eventId         Int           @map("event_id")
+  ticketId        Int           @map("ticket_id")
+  pointsUsed      Int?          @map("points_used")
+  couponId        Int?          @map("coupon_id")
+  paymentStatus   PaymentStatus
+  paymentProofUrl String?       @map("payment_proof_url")
+  paymentMethod   String        @map("payment_method")
   quantity        Int
   total           Int
-  paidAt          DateTime? @map("paid_at")
+  paidAt          DateTime?     @map("paid_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  expiresAt       DateTime?     @map("expires_at")
 
   user    User     @relation(fields: [userId], references: [id])
   event   Event    @relation(fields: [eventId], references: [id])
@@ -141,11 +153,12 @@ model Event {
 }
 
 model Ticket {
-  id       Int    @id @default(autoincrement())
-  eventId  Int    @map("event_id")
-  name     String
-  price    Int
-  quantity Int
+  id                Int    @id @default(autoincrement())
+  eventId           Int    @map("event_id")
+  name              String
+  price             Int
+  quantity          Int
+  availableQuantity Int    @map("available_quantity")
 
   event  Event   @relation(fields: [eventId], references: [id])
   orders Order[]
