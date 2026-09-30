@@ -7,6 +7,16 @@ function generateReferralCode() {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
 }
 
+const REFERRAL_POINTS = 10000;
+const COUPON_VALUE = 10000;
+const REWARD_VALID_MONTHS = 3;
+
+function addMonths(date: Date, months: number): Date {
+  const result = new Date(date);
+  result.setMonth(result.getMonth() + months);
+  return result;
+}
+
 export async function register(input: RegisterInput) {
   const existing = await prisma.user.findUnique({
     where: { email: input.email },
@@ -27,15 +37,59 @@ export async function register(input: RegisterInput) {
   }
   const hashedPassword = await bcrypt.hash(input.password, 10);
 
-  const user = await prisma.user.create({
-    data: {
-      name: input.name,
-      email: input.email,
-      password: hashedPassword,
-      role: input.role || "CUSTOMER",
-      referralCode: generateReferralCode(),
-      referredById: referredById,
-    },
+  // const user = await prisma.user.create({
+  //   data: {
+  //     name: input.name,
+  //     email: input.email,
+  //     password: hashedPassword,
+  //     role: input.role || "CUSTOMER",
+  //     referralCode: generateReferralCode(),
+  //     referredById: referredById,
+  //   },
+  // });
+
+  const user = await prisma.$transaction(async (tx) => {
+    const newUser = await tx.user.create({
+      data: {
+        name: input.name,
+        email: input.email,
+        password: hashedPassword,
+        role: input.role || "CUSTOMER",
+        referralCode: generateReferralCode(),
+        referredById: referredById,
+      },
+    });
+
+    if (newUser.role == "ORGANIZER") {
+      await tx.organization.create({
+        data: {
+          userId: newUser.id,
+          name: input.organizationName || input.name,
+        },
+      });
+    }
+
+    if (referredById) {
+      const expiresAt = addMonths(new Date(), REWARD_VALID_MONTHS);
+
+      await tx.point.create({
+        data: {
+          userId: referredById,
+          amount: REFERRAL_POINTS,
+          expiresAt: expiresAt,
+        },
+      });
+
+      await tx.coupon.create({
+        data: {
+          userId: newUser.id,
+          code: "REF-" + generateReferralCode(),
+          discountValue: COUPON_VALUE,
+          expiresAt: expiresAt,
+        },
+      });
+    }
+    return newUser;
   });
 
   const { password, ...safeUser } = user;

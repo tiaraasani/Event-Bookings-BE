@@ -1,11 +1,12 @@
 import {z} from "zod";
 
-export const registerSchema = z.object({
+export const registerSchema = z.strictObject({
   name: z.string().min(2),
   email: z.email(),
   password: z.string().min(6),
   role: z.enum(["CUSTOMER", "ORGANIZER"]).optional(),
   referralCode: z.string().optional(),
+  organizationName: z.string().min(2).optional(),
 });
 
 export const loginSchema = z.object({
