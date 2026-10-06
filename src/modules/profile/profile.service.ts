@@ -1,6 +1,6 @@
 import { prisma } from "../../lib/prisma";
 import { UpdateProfileInput, ChangePasswordInput } from "./profile.validation";
-import bcrypt from "bcrypt";
+import argon2 from "argon2";
 
 export async function getProfile(userId: number) {
   const user = await prisma.user.findUnique({
@@ -70,12 +70,12 @@ export async function changePassword(
     throw new Error("User not found");
   }
 
-  const valid = await bcrypt.compare(input.currentPassword, user.password);
+  const valid = await argon2.verify(user.password, input.currentPassword);
   if (!valid) {
     throw new Error("Current password is incorrect");
   }
 
-  const hashedPassword = await bcrypt.hash(input.newPassword, 10);
+  const hashedPassword = await argon2.hash(input.newPassword);
   await prisma.user.update({
     where: { id: userId },
     data: {

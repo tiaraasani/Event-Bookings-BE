@@ -1,6 +1,6 @@
+import argon2 from "argon2";
 import { prisma } from "../../lib/prisma";
 import { LoginInput, RegisterInput } from "./auth.validation";
-import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
 function generateReferralCode() {
@@ -35,7 +35,7 @@ export async function register(input: RegisterInput) {
     }
     referredById = referrer.id;
   }
-  const hashedPassword = await bcrypt.hash(input.password, 10);
+  const hashedPassword = await argon2.hash(input.password);
 
   // const user = await prisma.user.create({
   //   data: {
@@ -104,7 +104,7 @@ export async function login(input: LoginInput) {
     throw new Error("Invalid email or password");
   }
 
-  const valid = await bcrypt.compare(input.password, user.password);
+  const valid = await argon2.verify(user.password, input.password);
   if (!valid) {
     throw new Error("Invalid email or password");
   }
