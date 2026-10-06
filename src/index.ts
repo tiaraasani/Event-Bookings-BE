@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import authRouter from "./modules/auth/auth.router";
@@ -16,6 +16,15 @@ app.use("/api/profile", profileRouter)
 
 app.get("/", (_req, res) => {
   res.json({ message: "API running" });
+});
+
+app.use((_req,res,next) => {
+  res.status(404).json({ message: "Route not found" });
+});
+
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error(err);
+  res.status(500).json({ message: "Internal server error" });
 });
 
 app.listen(PORT, () => {
