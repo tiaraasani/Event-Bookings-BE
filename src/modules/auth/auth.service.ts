@@ -3,7 +3,6 @@ import { prisma } from "../../lib/prisma";
 import { LoginInput, RegisterInput } from "./auth.validation";
 import jwt from "jsonwebtoken";
 import { ApiError } from "../../utils/api-error";
-import { access } from "node:fs";
 
 function generateReferralCode() {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
