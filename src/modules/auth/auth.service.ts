@@ -2,6 +2,8 @@ import argon2 from "argon2";
 import { prisma } from "../../lib/prisma";
 import { LoginInput, RegisterInput } from "./auth.validation";
 import jwt from "jsonwebtoken";
+import { ApiError } from "../../utils/api-error";
+import { access } from "node:fs";
 
 function generateReferralCode() {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -22,7 +24,7 @@ export async function register(input: RegisterInput) {
     where: { email: input.email },
   });
   if (existing) {
-    throw new Error("Email already exists");
+    throw new ApiError("Email already exists", 400);
   }
 
   let referredById: number | null = null;
@@ -31,24 +33,13 @@ export async function register(input: RegisterInput) {
       where: { referralCode: input.referralCode },
     });
     if (!referrer) {
-      throw new Error("Invalid referral code");
+      throw new ApiError("Invalid referral code", 400);
     }
     referredById = referrer.id;
   }
   const hashedPassword = await argon2.hash(input.password);
 
-  // const user = await prisma.user.create({
-  //   data: {
-  //     name: input.name,
-  //     email: input.email,
-  //     password: hashedPassword,
-  //     role: input.role || "CUSTOMER",
-  //     referralCode: generateReferralCode(),
-  //     referredById: referredById,
-  //   },
-  // });
-
-  const user = await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     const newUser = await tx.user.create({
       data: {
         name: input.name,
@@ -89,11 +80,9 @@ export async function register(input: RegisterInput) {
         },
       });
     }
-    return newUser;
   });
 
-  const { password, ...safeUser } = user;
-  return safeUser;
+  return { message: "Register success" };
 }
 
 export async function login(input: LoginInput) {
@@ -101,12 +90,12 @@ export async function login(input: LoginInput) {
     where: { email: input.email },
   });
   if (!user) {
-    throw new Error("Invalid email or password");
+    throw new ApiError("Invalid email or password", 400);
   }
 
   const valid = await argon2.verify(user.password, input.password);
   if (!valid) {
-    throw new Error("Invalid email or password");
+    throw new ApiError("Invalid email or password", 400);
   }
 
   const token = jwt.sign(
@@ -115,6 +104,16 @@ export async function login(input: LoginInput) {
     { expiresIn: "1h" },
   );
 
-  const { password, ...safeUser } = user;
-  return { user: safeUser, token };
+  return {
+    message: "Login success",
+    accessToken: token,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      picture: user.picture,
+      referralCode: user.referralCode,
+    },
+  };
 }

@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authRouter from "./modules/auth/auth.router";
 import profileRouter from "./modules/profile/profile.router"
+import { globalError, notFoundError } from "./utils/errors";
 
 dotenv.config();
 
@@ -18,14 +19,8 @@ app.get("/", (_req, res) => {
   res.json({ message: "API running" });
 });
 
-app.use((_req,res,next) => {
-  res.status(404).json({ message: "Route not found" });
-});
-
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error(err);
-  res.status(500).json({ message: "Internal server error" });
-});
+app.use(notFoundError);
+app.use(globalError);
 
 app.listen(PORT, () => {
   console.log(`Server on http://localhost:${PORT}`);
