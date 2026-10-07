@@ -1,4 +1,5 @@
 import { prisma } from "../../lib/prisma";
+import { ApiError } from "../../utils/api-error";
 import { UpdateProfileInput, ChangePasswordInput } from "./profile.validation";
 import argon2 from "argon2";
 
@@ -10,11 +11,11 @@ export async function getProfile(userId: number) {
     },
   });
   if (!user) {
-    throw new Error("User not found");
+    throw new ApiError("User not found", 404);
   }
 
   const now = new Date();
-  
+
   //gt mksdnya greater than (ambil point yg blm expired)
   const pointSum = await prisma.point.aggregate({
     where: {
@@ -48,15 +49,14 @@ export async function getProfile(userId: number) {
 }
 
 export async function updateProfile(userId: number, input: UpdateProfileInput) {
-  const user = await prisma.user.update({
+  await prisma.user.update({
     where: { id: userId },
     data: {
       name: input.name,
     },
   });
 
-  const { password, ...safeUser } = user;
-  return safeUser;
+  return { message: "Profile updated successfully" };
 }
 
 export async function changePassword(
@@ -67,12 +67,12 @@ export async function changePassword(
     where: { id: userId },
   });
   if (!user) {
-    throw new Error("User not found");
+    throw new ApiError("User not found", 404);
   }
 
   const valid = await argon2.verify(user.password, input.currentPassword);
   if (!valid) {
-    throw new Error("Current password is incorrect");
+    throw new ApiError("Current password is incorrect", 400);
   }
 
   const hashedPassword = await argon2.hash(input.newPassword);
@@ -82,4 +82,5 @@ export async function changePassword(
       password: hashedPassword,
     },
   });
+  return { message: "Password changed successfully" };
 }
