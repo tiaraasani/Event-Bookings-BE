@@ -1,8 +1,14 @@
 import argon2 from "argon2";
 import { prisma } from "../../lib/prisma";
-import { LoginInput, RegisterInput } from "./auth.validation";
+import {
+  LoginInput,
+  RegisterInput,
+  ForgotPasswordInput,
+  ResetPasswordInput,
+} from "./auth.validation";
 import jwt from "jsonwebtoken";
 import { ApiError } from "../../utils/api-error";
+import { sendMail } from "../../lib/mail";
 
 function generateReferralCode() {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -115,4 +121,50 @@ export async function login(input: LoginInput) {
       referralCode: user.referralCode,
     },
   };
+}
+
+export async function forgotPassword(input: ForgotPasswordInput) {
+  const user = await prisma.user.findUnique({
+    where: { email: input.email },
+  });
+
+  if (!user) {
+    return {
+      message: "If the emais is registered, a reset link has been sent",
+    };
+  }
+
+  const token = jwt.sign(
+    { id: user.id, role: user.role },
+    process.env.JWT_SECRET_RESET!,
+    { expiresIn: "15m" },
+  );
+
+  await sendMail({
+    to: user.email,
+    subject: "Reset Password Request",
+    templateName: "reset-password.hbs",
+    context: {
+      linkReset: `${process.env.BASE_URL_FE}/reset-password?token=${token}`,
+    },
+  });
+  return { message: "If the email is registered, a reset link has been sent" };
+}
+
+export async function resetPassword(input: ResetPasswordInput, userId: number) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new ApiError("User not found", 404);
+  }
+
+  const hashedPassword = await argon2.hash(input.password);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { password: hashedPassword },
+  });
+  return { message: "Reset password successfuly" };
 }
