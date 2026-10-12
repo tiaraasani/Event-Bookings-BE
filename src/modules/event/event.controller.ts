@@ -13,7 +13,13 @@ export const createEventController = async (
   next: NextFunction,
 ) => {
   try {
-    const result = await createEventService(req.body);
+    const files = req.files as
+      | { [fieldname: string]: Express.Multer.File[] }
+      | undefined;
+
+    const imageFile = files?.image?.[0];
+
+    const result = await createEventService(req.body, imageFile);
 
     res.status(201).send({
       message: "Event created successfully",
@@ -47,8 +53,7 @@ export const getEventByIdController = async (
   next: NextFunction,
 ) => {
   try {
-    const id = Number(req.params.id);
-    const result = await getEventByIdService(id);
+    const result = await getEventByIdService(Number(req.params.id));
 
     res.status(200).send({
       message: "Event retrieved successfully",
@@ -65,8 +70,7 @@ export const updateEventController = async (
   next: NextFunction,
 ) => {
   try {
-    const id = Number(req.params.id);
-    const result = await updateEventService(id, req.body);
+    const result = await updateEventService(Number(req.params.id), req.body);
 
     res.status(200).send({
       message: "Event updated successfully",
@@ -83,11 +87,12 @@ export const deleteEventController = async (
   next: NextFunction,
 ) => {
   try {
-    const id = Number(req.params.id);
+    const result = await deleteEventService(Number(req.params.id));
 
-    const result = await deleteEventService(id);
-
-    res.status(200).send(result);
+    res.status(200).send({
+      message: "Event deleted successfully",
+      data: result,
+    });
   } catch (error) {
     next(error);
   }
