@@ -4,8 +4,19 @@ import type {
   CreateEventSchema,
   UpdateEventSchema,
 } from "./event.validation.js";
+import { uploadImage } from "../../lib/cloudinary.js";
 
-export const createEventService = async (data: CreateEventSchema) => {
+export const createEventService = async (
+  data: CreateEventSchema,
+  imageFile?: Express.Multer.File,
+) => {
+  let imageUrl = data.image || null;
+
+  if (imageFile) {
+    const uploadedImage = await uploadImage(imageFile);
+    imageUrl = uploadedImage.secure_url;
+  }
+
   const event = await prisma.event.create({
     data: {
       categoryId: data.categoryId,
@@ -15,7 +26,7 @@ export const createEventService = async (data: CreateEventSchema) => {
       city: data.city,
       type: data.type,
       slug: data.slug,
-      image: data.image,
+      image: imageUrl,
       startDate: data.startDate,
       endDate: data.endDate,
       tickets: {
