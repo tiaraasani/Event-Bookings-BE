@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Request, Response, NextFunction } from "express";
 import {
   createEventController,
   getEventsController,
@@ -7,11 +8,21 @@ import {
   deleteEventController,
 } from "./event.controller.js";
 import { validate } from "../../middlewares/validate.js";
+import { authenticate } from "../../middlewares/auth.js";
 import { upload } from "../../middlewares/upload.js";
 import { createEventSchema, updateEventSchema } from "./event.validation.js";
-import type { Request, Response, NextFunction } from "express";
 
 const router = Router();
+
+const requireOrganizer = (req: Request, res: Response, next: NextFunction) => {
+  if (req.user?.role !== "ORGANIZER") {
+    return res.status(403).json({
+      message: "Only organizers can manage events",
+    });
+  }
+
+  next();
+};
 
 const parseEventFormData = (
   req: Request,
@@ -34,14 +45,22 @@ router.get("/:id", getEventByIdController);
 
 router.post(
   "/",
+  authenticate,
+  requireOrganizer,
   upload().fields([{ name: "image", maxCount: 1 }]),
   parseEventFormData,
   validate(createEventSchema),
   createEventController,
 );
 
-router.patch("/:id", validate(updateEventSchema), updateEventController);
+router.patch(
+  "/:id",
+  authenticate,
+  requireOrganizer,
+  validate(updateEventSchema),
+  updateEventController,
+);
 
-router.delete("/:id", deleteEventController);
+router.delete("/:id", authenticate, requireOrganizer, deleteEventController);
 
 export default router;
