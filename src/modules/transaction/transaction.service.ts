@@ -28,6 +28,37 @@ export const createTransactionService = async (
       throw new ApiError("Not enough tickets available", 400);
     }
 
+    const total = ticket.price * data.quantity;
+    const pointsToUse = data.pointsToUse ?? 0;
+
+    if (pointsToUse > total) {
+      throw new ApiError("Points cannot exceed the total ticket price", 400);
+    }
+
+    const pointRecords = await tx.point.findMany({
+      where: {
+        userId,
+        expiresAt: {
+          gt: new Date(),
+        },
+        amount: {
+          gt: 0,
+        },
+      },
+      orderBy: {
+        expiresAt: "asc",
+      },
+    });
+
+    const availablePoints = pointRecords.reduce(
+      (sum, point) => sum + point.amount,
+      0,
+    );
+
+    if (pointsToUse > availablePoints) {
+      throw new ApiError("Insufficient points balance", 400);
+    }
+
     const stockUpdate = await tx.ticket.updateMany({
       where: {
         id: data.ticketId,
@@ -46,7 +77,6 @@ export const createTransactionService = async (
       throw new ApiError("Not enough tickets available", 400);
     }
 
-    const total = ticket.price * data.quantity;
     const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
 
     const order = await tx.order.create({
@@ -55,24 +85,55 @@ export const createTransactionService = async (
         ticketId: ticket.id,
         quantity: data.quantity,
         total,
-        finalPrice: total,
+        pointsUsed: pointsToUse,
+        discount: pointsToUse,
+        finalPrice: total - pointsToUse,
         paymentStatus: PaymentStatus.WAITING_FOR_PAYMENT,
         expiresAt,
       },
+    });
+
+    let remainingPoints = pointsToUse;
+
+    for (const point of pointRecords) {
+      if (remainingPoints <= 0) break;
+
+      const amountToUse = Math.min(point.amount, remainingPoints);
+
+      await tx.point.update({
+        where: { id: point.id },
+        data: {
+          amount: {
+            decrement: amountToUse,
+          },
+        },
+      });
+
+      await tx.pointUsage.create({
+        data: {
+          orderId: order.id,
+          pointId: point.id,
+          amount: amountToUse,
+        },
+      });
+
+      remainingPoints -= amountToUse;
+    }
+
+    return tx.order.findUniqueOrThrow({
+      where: { id: order.id },
       include: {
         ticket: {
           include: {
             event: true,
           },
         },
+        pointUsages: true,
       },
     });
-
-    return order;
   });
 };
 
-// Add this function below createTransactionService.
 export const uploadPaymentProofService = async (
   userId: number,
   orderId: number,
@@ -135,4 +196,20 @@ export const getMyTransactionsService = async (userId: number) => {
   });
 
   return transactions;
+};
+
+export const getMyPointBalanceService = async (userId: number) => {
+  const points = await prisma.point.findMany({
+    where: {
+      userId,
+      expiresAt: {
+        gt: new Date(),
+      },
+      amount: {
+        gt: 0,
+      },
+    },
+  });
+
+  return points.reduce((total, point) => total + point.amount, 0);
 };

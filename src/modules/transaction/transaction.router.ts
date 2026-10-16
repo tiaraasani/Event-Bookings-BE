@@ -5,6 +5,7 @@ import { validate } from "../../middlewares/validate";
 import { createTransactionSchema } from "./transaction.validation";
 import {
   createTransactionController,
+  getMyPointBalanceController,
   getMyTransactionsController,
 } from "./transaction.controller";
 import { uploadPaymentProofController } from "./transaction.controller";
@@ -33,6 +34,13 @@ router.get(
   authenticate,
   authorize(Role.CUSTOMER),
   getMyTransactionsController,
+);
+
+router.get(
+  "/my/points",
+  authenticate,
+  authorize(Role.CUSTOMER),
+  getMyPointBalanceController,
 );
 
 export default router;
