@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import {
   createTransactionService,
+  getMyPointBalanceService,
   getMyTransactionsService,
   uploadPaymentProofService,
 } from "./transaction.service.js";
@@ -64,6 +65,25 @@ export const getMyTransactionsController = async (
     res.status(200).json({
       message: "Transactions retrieved successfully",
       data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMyPointBalanceController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const result = await getMyPointBalanceService(req.user!.id);
+
+    res.status(200).json({
+      message: "Point balance retrieved successfully",
+      data: {
+        balance: result,
+      },
     });
   } catch (error) {
     next(error);
