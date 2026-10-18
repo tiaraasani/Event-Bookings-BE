@@ -2,6 +2,7 @@ import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../utils/api-error";
 import { UpdateProfileInput, ChangePasswordInput } from "./profile.validation";
 import argon2 from "argon2";
+import { uploadImage, removeImageByUrl } from "../../lib/cloudinary";
 
 export async function getProfile(userId: number) {
   const user = await prisma.user.findUnique({
@@ -83,4 +84,31 @@ export async function changePassword(
     },
   });
   return { message: "Password changed successfully" };
+}
+
+export async function updatePicture(userId: number, file: Express.Multer.File) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+  if (!user) {
+    throw new ApiError("User not found", 404);
+  }
+
+  const { secure_url } = await uploadImage(file);
+
+  if (user.picture) {
+    await removeImageByUrl(user.picture);
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      picture: secure_url,
+    },
+  });
+
+  return {
+    message: "Profile picture updated successfully",
+    picture: secure_url,
+  };
 }
