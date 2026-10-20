@@ -19,7 +19,7 @@ export const createEventController = async (
 
     const imageFile = files?.image?.[0];
 
-    const result = await createEventService(req.body, imageFile);
+    const result = await createEventService(req.user!.id, req.body, imageFile);
 
     res.status(201).send({
       message: "Event created successfully",
@@ -70,7 +70,11 @@ export const updateEventController = async (
   next: NextFunction,
 ) => {
   try {
-    const result = await updateEventService(Number(req.params.id), req.body);
+    const result = await updateEventService(
+      req.user!.id,
+      Number(req.params.id),
+      req.body,
+    );
 
     res.status(200).send({
       message: "Event updated successfully",
@@ -87,7 +91,10 @@ export const deleteEventController = async (
   next: NextFunction,
 ) => {
   try {
-    const result = await deleteEventService(Number(req.params.id));
+    const result = await deleteEventService(
+      req.user!.id,
+      Number(req.params.id),
+    );
 
     res.status(200).send({
       message: "Event deleted successfully",

@@ -6,6 +6,7 @@ import profileRouter from "./modules/profile/profile.router";
 import { globalError, notFoundError } from "./utils/errors";
 import eventRouter from "./modules/event/event.router";
 import transactionRouter from "./modules/transaction/transaction.router";
+import organizerRouter from "./modules/organizer/organizer.router";
 
 dotenv.config();
 
@@ -18,6 +19,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/profile", profileRouter);
 app.use("/api/events", eventRouter);
 app.use("/api/transactions", transactionRouter);
+app.use("/api/organizer", organizerRouter);
 
 app.get("/", (_req, res) => {
   res.json({ message: "API running" });

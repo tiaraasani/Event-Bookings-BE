@@ -3,7 +3,6 @@ import { z } from "zod";
 export const createEventSchema = z
   .object({
     categoryId: z.coerce.number().int().positive(),
-    organizationId: z.coerce.number().int().positive(),
     name: z.string().min(3),
     description: z.string().optional(),
     city: z.string().min(2),
@@ -30,7 +29,6 @@ export const createEventSchema = z
 export const updateEventSchema = z
   .object({
     categoryId: z.coerce.number().int().positive().optional(),
-    organizationId: z.coerce.number().int().positive().optional(),
     name: z.string().min(3).optional(),
     description: z.string().optional(),
     city: z.string().min(2).optional(),
