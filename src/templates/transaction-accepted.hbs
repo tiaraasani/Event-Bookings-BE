@@ -1,0 +1,42 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Payment Accepted</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #f4f4f4;
+        font-family: Arial, sans-serif;
+        color: #333;
+      }
+      .container {
+        max-width: 600px;
+        margin: 40px auto;
+        padding: 40px;
+        background-color: #ffffff;
+        border-radius: 8px;
+      }
+      .footer {
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+        font-size: 14px;
+        color: #777;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Payment Accepted</h1>
+      <p>Hi {{name}},</p>
+      <p>Your payment for
+        <strong>{{eventName}}</strong>
+        (order #{{orderId}}) has been confirmed.</p>
+      <p>Ticket: {{ticketName}} x {{quantity}}</p>
+      <p>Total paid: Rp {{finalPrice}}</p>
+      <p>See you at the event!</p>
+      <div class="footer">Best regards,<br /><strong>Event Platform Team</strong></div>
+    </div>
+  </body>
+</html>

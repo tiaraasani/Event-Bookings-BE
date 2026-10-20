@@ -6,10 +6,24 @@ import type {
 } from "./event.validation.js";
 import { uploadImage } from "../../lib/cloudinary.js";
 
+const getOrganization = async (userId: number) => {
+  const organization = await prisma.organization.findUnique({
+    where: { userId },
+  });
+
+  if (!organization) {
+    throw new ApiError("Organization not found", 404);
+  }
+
+  return organization;
+};
+
 export const createEventService = async (
+  userId: number,
   data: CreateEventSchema,
   imageFile?: Express.Multer.File,
 ) => {
+  const organization = await getOrganization(userId);
   let imageUrl = data.image || null;
 
   if (imageFile) {
@@ -20,7 +34,7 @@ export const createEventService = async (
   const event = await prisma.event.create({
     data: {
       categoryId: data.categoryId,
-      organizationId: data.organizationId,
+      organizationId: organization.id,
       name: data.name,
       description: data.description,
       city: data.city,
@@ -104,14 +118,16 @@ export const getEventByIdService = async (id: number) => {
 };
 
 export const updateEventService = async (
+  userId: number,
   id: number,
   data: UpdateEventSchema,
 ) => {
+  const organization = await getOrganization(userId);
   const event = await prisma.event.findUnique({
     where: { id },
   });
 
-  if (!event) {
+  if (!event || event.organizationId !== organization.id) {
     throw new ApiError("Event not found", 404);
   }
 
@@ -134,12 +150,17 @@ export const updateEventService = async (
   return updatedEvent;
 };
 
-export const deleteEventService = async (id: number) => {
+export const deleteEventService = async (userId: number, id: number) => {
+  const organization = await getOrganization(userId);
   const event = await prisma.event.findUnique({
     where: { id },
   });
 
-  if (!event || event.deletedAt !== null) {
+  if (
+    !event ||
+    event.deletedAt !== null ||
+    event.organizationId !== organization.id
+  ) {
     throw new ApiError("Event not found", 404);
   }
 
