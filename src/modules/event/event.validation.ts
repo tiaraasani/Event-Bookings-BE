@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const createEventSchema = z
   .object({
-    categoryId: z.coerce.number().int().positive(),
+    categoryId: z.coerce.number().int().positive().optional(),
+    customCategory: z.string().trim().optional(),
     name: z.string().min(3),
     description: z.string().optional(),
     city: z.string().min(2),
@@ -24,7 +25,15 @@ export const createEventSchema = z
   .refine((data) => data.endDate > data.startDate, {
     message: "End date must be after start date",
     path: ["endDate"],
-  });
+  })
+  .refine(
+    (data) =>
+      data.categoryId !== undefined || Boolean(data.customCategory?.trim()),
+    {
+      message: "Please select or enter a category",
+      path: ["categoryId"],
+    },
+  );
 
 export const updateEventSchema = z
   .object({

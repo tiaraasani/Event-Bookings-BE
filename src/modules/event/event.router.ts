@@ -6,6 +6,7 @@ import {
   getEventByIdController,
   updateEventController,
   deleteEventController,
+  getMyOrganizedEventsController,
 } from "./event.controller.js";
 import { validate } from "../../middlewares/validate.js";
 import { authenticate } from "../../middlewares/auth.js";
@@ -41,7 +42,12 @@ const parseEventFormData = (
 };
 
 router.get("/", getEventsController);
-router.get("/:id", getEventByIdController);
+router.get(
+  "/my",
+  authenticate,
+  requireOrganizer,
+  getMyOrganizedEventsController,
+);
 
 router.post(
   "/",
@@ -52,6 +58,7 @@ router.post(
   validate(createEventSchema),
   createEventController,
 );
+router.get("/:id", getEventByIdController);
 
 router.patch(
   "/:id",
