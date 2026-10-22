@@ -31,9 +31,31 @@ export const createEventService = async (
     imageUrl = uploadedImage.secure_url;
   }
 
+  let categoryId = data.categoryId;
+
+  if (data.customCategory?.trim()) {
+    const categoryName = data.customCategory.trim();
+
+    const category = await prisma.category.upsert({
+      where: {
+        name: categoryName,
+      },
+      update: {},
+      create: {
+        name: categoryName,
+      },
+    });
+
+    categoryId = category.id;
+  }
+
+  if (!categoryId) {
+    throw new ApiError("Please select a category", 400);
+  }
+
   const event = await prisma.event.create({
     data: {
-      categoryId: data.categoryId,
+      categoryId,
       organizationId: organization.id,
       name: data.name,
       description: data.description,
@@ -72,6 +94,9 @@ export const getEventsService = async () => {
   const events = await prisma.event.findMany({
     where: {
       deletedAt: null,
+      endDate: {
+        gt: new Date(),
+      },
     },
     include: {
       category: true,
@@ -95,7 +120,7 @@ export const getEventsService = async () => {
 export const getEventByIdService = async (id: number) => {
   const event = await prisma.event.findUnique({
     where: {
-      id,
+      id: id,
     },
     include: {
       category: true,
@@ -110,13 +135,12 @@ export const getEventByIdService = async (id: number) => {
     },
   });
 
-  if (!event || event.deletedAt !== null) {
+  if (!event || event.deletedAt !== null || event.endDate <= new Date()) {
     throw new ApiError("Event not found", 404);
   }
 
   return event;
 };
-
 export const updateEventService = async (
   userId: number,
   id: number,
@@ -172,4 +196,37 @@ export const deleteEventService = async (userId: number, id: number) => {
   });
 
   return { message: "Event deleted successfully" };
+};
+
+export const getMyOrganizedEventsService = async (userId: number) => {
+  const organization = await prisma.organization.findUnique({
+    where: {
+      userId,
+    },
+  });
+
+  if (!organization) {
+    return [];
+  }
+
+  return prisma.event.findMany({
+    where: {
+      organizationId: organization.id,
+      deletedAt: null,
+    },
+    include: {
+      category: true,
+      tickets: true,
+      organization: {
+        select: {
+          id: true,
+          name: true,
+          logo: true,
+        },
+      },
+    },
+    orderBy: {
+      startDate: "asc",
+    },
+  });
 };

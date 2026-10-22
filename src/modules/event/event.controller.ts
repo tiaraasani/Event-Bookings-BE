@@ -5,7 +5,9 @@ import {
   getEventByIdService,
   updateEventService,
   deleteEventService,
+  getMyOrganizedEventsService,
 } from "./event.service.js";
+import { ApiError } from "../../utils/api-error.js";
 
 export const createEventController = async (
   req: Request,
@@ -53,7 +55,13 @@ export const getEventByIdController = async (
   next: NextFunction,
 ) => {
   try {
-    const result = await getEventByIdService(Number(req.params.id));
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new ApiError("Invalid event ID", 400);
+    }
+
+    const result = await getEventByIdService(id);
 
     res.status(200).send({
       message: "Event retrieved successfully",
@@ -98,6 +106,23 @@ export const deleteEventController = async (
 
     res.status(200).send({
       message: "Event deleted successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMyOrganizedEventsController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const result = await getMyOrganizedEventsService(req.user!.id);
+
+    res.status(200).json({
+      message: "Organized events retrieved successfully",
       data: result,
     });
   } catch (error) {

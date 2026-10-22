@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from "express";
+import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import authRouter from "./modules/auth/auth.router";
@@ -7,6 +7,8 @@ import { globalError, notFoundError } from "./utils/errors";
 import eventRouter from "./modules/event/event.router";
 import transactionRouter from "./modules/transaction/transaction.router";
 import organizerRouter from "./modules/organizer/organizer.router";
+import reviewRoutes from "./modules/review/review.router.js";
+import { expiredTransactionCron } from "./script/transaction.js";
 
 dotenv.config();
 
@@ -15,11 +17,15 @@ const PORT = process.env.PORT || 8000;
 
 app.use(cors());
 app.use(express.json());
+
 app.use("/api/auth", authRouter);
 app.use("/api/profile", profileRouter);
 app.use("/api/events", eventRouter);
 app.use("/api/transactions", transactionRouter);
 app.use("/api/organizer", organizerRouter);
+app.use("/api/reviews", reviewRoutes);
+
+expiredTransactionCron();
 
 app.get("/", (_req, res) => {
   res.json({ message: "API running" });
