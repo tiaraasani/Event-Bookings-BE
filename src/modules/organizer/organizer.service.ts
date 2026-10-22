@@ -30,6 +30,30 @@ async function getOwnedOrder(orderId: number, organizationId: number) {
   }
   return order;
 }
+type StatRow = {
+  label: string;
+  tickets: number;
+  revenue: number;
+};
+
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+function emptyRows(labels: string[]): StatRow[] {
+  return labels.map((label) => ({ label, tickets: 0, revenue: 0 }));
+}
 
 export async function getTransactions(userId: number) {
   const organization = await getOrganization(userId);
@@ -159,4 +183,153 @@ export async function rejectTransaction(userId: number, orderId: number) {
   });
 
   return { message: "Transaction rejected" };
+}
+export async function getStatistics(
+  userId: number,
+  year: number,
+  month: number,
+) {
+  const organization = await getOrganization(userId);
+
+  const totalEvents = await prisma.event.count({
+    where: {
+      organizationId: organization.id,
+      deletedAt: null,
+    },
+  });
+
+  const orders = await prisma.order.findMany({
+    where: {
+      paymentStatus: "PAID",
+      ticket: {
+        event: {
+          organizationId: organization.id,
+        },
+      },
+    },
+    select: {
+      quantity: true,
+      finalPrice: true,
+      paidAt: true,
+      createdAt: true,
+    },
+  });
+
+  const summary = {
+    totalEvents: totalEvents,
+    totalOrders: orders.length,
+    totalTickets: 0,
+    totalRevenue: 0,
+  };
+
+  const yearMap: Record<number, StatRow> = {};
+  const byMonth = emptyRows(MONTH_LABELS);
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const dayLabels: string[] = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    dayLabels.push(String(day));
+  }
+  const byDay = emptyRows(dayLabels);
+
+  for (const order of orders) {
+    summary.totalTickets += order.quantity;
+    summary.totalRevenue += order.finalPrice;
+
+    const date = order.paidAt ?? order.createdAt;
+    const orderYear = date.getFullYear();
+    const orderMonth = date.getMonth() + 1;
+    const orderDay = date.getDate();
+
+    if (!yearMap[orderYear]) {
+      yearMap[orderYear] = {
+        label: String(orderYear),
+        tickets: 0,
+        revenue: 0,
+      };
+    }
+    yearMap[orderYear].tickets += order.quantity;
+    yearMap[orderYear].revenue += order.finalPrice;
+
+    if (orderYear === year) {
+      byMonth[orderMonth - 1].tickets += order.quantity;
+      byMonth[orderMonth - 1].revenue += order.finalPrice;
+
+      if (orderMonth === month) {
+        byDay[orderDay - 1].tickets += order.quantity;
+        byDay[orderDay - 1].revenue += order.finalPrice;
+      }
+    }
+  }
+
+  const byYear = Object.values(yearMap);
+
+  return { year, month, summary, byYear, byMonth, byDay };
+}
+export async function getEventAttendees(userId: number, eventId: number) {
+  const organization = await getOrganization(userId);
+
+  const event = await prisma.event.findFirst({
+    where: {
+      id: eventId,
+      organizationId: organization.id,
+      deletedAt: null,
+    },
+    select: {
+      id: true,
+      name: true,
+      startDate: true,
+    },
+  });
+
+  if (!event) {
+    throw new ApiError("Event not found", 404);
+  }
+
+  const orders = await prisma.order.findMany({
+    where: {
+      paymentStatus: "PAID",
+      ticket: {
+        eventId: event.id,
+      },
+    },
+    include: {
+      user: {
+        select: { name: true, email: true },
+      },
+      ticket: {
+        select: { name: true },
+      },
+    },
+    orderBy: {
+      paidAt: "asc",
+    },
+  });
+
+  const attendees = orders.map((order) => ({
+    orderId: order.id,
+    name: order.user.name,
+    email: order.user.email,
+    ticketName: order.ticket.name,
+    quantity: order.quantity,
+    totalPaid: order.finalPrice,
+    paidAt: order.paidAt,
+  }));
+
+  let totalTickets = 0;
+  let totalRevenue = 0;
+  for (const attendee of attendees) {
+    totalTickets += attendee.quantity;
+    totalRevenue += attendee.totalPaid;
+  }
+
+  return {
+    event,
+    summary: {
+      totalAttendees: attendees.length,
+      totalTickets,
+      totalRevenue,
+    },
+    attendees,
+  };
 }
