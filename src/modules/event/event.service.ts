@@ -143,19 +143,66 @@ export const updateEventService = async (
   userId: number,
   id: number,
   data: UpdateEventSchema,
+  imageFile?: Express.Multer.File,
 ) => {
   const organization = await getOrganization(userId);
   const event = await prisma.event.findUnique({
     where: { id },
   });
 
-  if (!event || event.organizationId !== organization.id) {
+  if (
+    !event ||
+    event.deletedAt !== null ||
+    event.organizationId !== organization.id
+  ) {
     throw new ApiError("Event not found", 404);
+  }
+
+  let imageUrl = data.image;
+
+  if (imageFile) {
+    const uploadedImage = await uploadImage(imageFile);
+    imageUrl = uploadedImage.secure_url;
+  }
+
+  let categoryId = data.categoryId;
+
+  if (data.customCategory?.trim()) {
+    const categoryName = data.customCategory.trim();
+
+    const category = await prisma.category.upsert({
+      where: {
+        name: categoryName,
+      },
+      update: {},
+      create: {
+        name: categoryName,
+      },
+    });
+
+    categoryId = category.id;
+  }
+
+  const startDate = data.startDate ?? event.startDate;
+  const endDate = data.endDate ?? event.endDate;
+
+  if (endDate <= startDate) {
+    throw new ApiError("End date must be after start date", 400);
   }
 
   const updatedEvent = await prisma.event.update({
     where: { id },
-    data,
+    data: {
+      categoryId,
+      name: data.name,
+      description: data.description,
+      city: data.city,
+      type: data.type,
+      slug: data.slug,
+      image: imageUrl,
+      startDate: data.startDate,
+      endDate: data.endDate,
+    },
     include: {
       category: true,
       organization: {

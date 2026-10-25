@@ -1,6 +1,8 @@
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../utils/api-error";
 import { sendMail } from "../../lib/mail";
+import { PaymentStatus, Prisma } from "../../generated/prisma/client";
+import type { PaginationQueryParams } from "../../types/pagination";
 
 async function getOrganization(userId: number) {
   const organization = await prisma.organization.findUnique({
@@ -55,17 +57,38 @@ function emptyRows(labels: string[]): StatRow[] {
   return labels.map((label) => ({ label, tickets: 0, revenue: 0 }));
 }
 
-export async function getTransactions(userId: number) {
+export async function getTransactions(
+  userId: number,
+  query: PaginationQueryParams & { status?: PaymentStatus },
+) {
+  const { page, take, sortBy, sortOrder, search, status } = query;
   const organization = await getOrganization(userId);
 
-  const orders = await prisma.order.findMany({
-    where: {
-      ticket: {
-        event: {
-          organizationId: organization.id,
-        },
+  const whereClause: Prisma.OrderWhereInput = {
+    ticket: {
+      event: {
+        organizationId: organization.id,
       },
     },
+  };
+
+  if (status) {
+    whereClause.paymentStatus = status;
+  }
+
+  if (search) {
+    whereClause.user = {
+      OR: [
+        { name: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+      ],
+    };
+  }
+
+  const orders = await prisma.order.findMany({
+    where: whereClause,
+    skip: (page - 1) * take,
+    take: take,
     include: {
       user: {
         select: { id: true, name: true, email: true },
@@ -79,11 +102,16 @@ export async function getTransactions(userId: number) {
       },
     },
     orderBy: {
-      createdAt: "desc",
+      [sortBy]: sortOrder,
     },
   });
 
-  return orders;
+  const total = await prisma.order.count({ where: whereClause });
+
+  return {
+    data: orders,
+    meta: { page, take, total },
+  };
 }
 
 export async function acceptTransaction(userId: number, orderId: number) {
