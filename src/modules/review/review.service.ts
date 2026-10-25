@@ -6,66 +6,9 @@ export const createReviewService = async (
   userId: number,
   data: CreateReviewSchema,
 ) => {
-  const order = await prisma.order.findUnique({
-    where: {
-      id: data.orderId,
-    },
-    include: {
-      ticket: {
-        include: {
-          event: true,
-        },
-      },
-    },
-  });
-
-  if (!order) {
-    throw new ApiError("Order not found", 404);
-  }
-
-  if (order.userId !== userId) {
-    throw new ApiError("You are not allowed to review this order", 403);
-  }
-
-  if (order.paymentStatus !== "PAID") {
-    throw new ApiError("Only paid orders can be reviewed", 400);
-  }
-
-  if (order.ticket.event.endDate > new Date()) {
-    throw new ApiError("You can only review after the event has ended", 400);
-  }
-
-  const existingReview = await prisma.review.findUnique({
-    where: {
-      orderId_type: {
-        orderId: data.orderId,
-        type: data.type,
-      },
-    },
-  });
-
-  if (existingReview) {
-    throw new ApiError(
-      `You have already submitted an ${data.type.toLowerCase()} review for this order`,
-      409,
-    );
-  }
-
-  return prisma.review.create({
-    data: {
-      orderId: data.orderId,
-      type: data.type,
-      rating: data.rating,
-      title: data.title,
-      comment: data.comment,
-    },
-  });
-};
-
-export const getEventReviewsService = async (eventId: number) => {
   const event = await prisma.event.findFirst({
     where: {
-      id: eventId,
+      id: data.eventId,
       deletedAt: null,
     },
   });
@@ -74,7 +17,70 @@ export const getEventReviewsService = async (eventId: number) => {
     throw new ApiError("Event not found", 404);
   }
 
-  const reviews = await prisma.review.findMany({
+  if (event.endDate >= new Date()) {
+    throw new ApiError("You can only review an event after it has ended", 400);
+  }
+
+  const eligibleOrder = await prisma.order.findFirst({
+    where: {
+      userId,
+      paymentStatus: "PAID",
+      ticket: {
+        eventId: data.eventId,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!eligibleOrder) {
+    throw new ApiError(
+      "You must purchase and pay for a ticket to review this event",
+      403,
+    );
+  }
+
+  const existingReview = await prisma.review.findUnique({
+    where: {
+      orderId_type: {
+        orderId: eligibleOrder.id,
+        type: data.type,
+      },
+    },
+  });
+
+  if (existingReview) {
+    throw new ApiError(
+      "You have already submitted this type of review for this order",
+      409,
+    );
+  }
+
+  const review = await prisma.review.create({
+    data: {
+      orderId: eligibleOrder.id,
+      type: data.type,
+      rating: data.rating,
+      title: data.title,
+      comment: data.comment,
+    },
+  });
+
+  return review;
+};
+
+export const getEventReviewsService = async (eventId: number) => {
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true },
+  });
+
+  if (!event) {
+    throw new ApiError("Event not found", 404);
+  }
+
+  return prisma.review.findMany({
     where: {
       type: "EVENT",
       order: {
@@ -85,12 +91,11 @@ export const getEventReviewsService = async (eventId: number) => {
     },
     include: {
       order: {
-        include: {
+        select: {
           user: {
             select: {
               id: true,
               name: true,
-              picture: true,
             },
           },
         },
@@ -100,41 +105,19 @@ export const getEventReviewsService = async (eventId: number) => {
       createdAt: "desc",
     },
   });
-
-  const totalReviews = reviews.length;
-
-  const averageRating =
-    totalReviews === 0
-      ? 0
-      : reviews.reduce((total, review) => total + review.rating, 0) /
-        totalReviews;
-
-  return {
-    averageRating: Number(averageRating.toFixed(1)),
-    totalReviews,
-    reviews: reviews.map((review) => ({
-      id: review.id,
-      rating: review.rating,
-      title: review.title,
-      comment: review.comment,
-      createdAt: review.createdAt,
-      user: review.order.user,
-    })),
-  };
 };
 
-export const getOrganizerReviewsService = async (organizationId: number) => {
+export const getOrganizationReviewsService = async (organizationId: number) => {
   const organization = await prisma.organization.findUnique({
-    where: {
-      id: organizationId,
-    },
+    where: { id: organizationId },
+    select: { id: true },
   });
 
   if (!organization) {
     throw new ApiError("Organization not found", 404);
   }
 
-  const reviews = await prisma.review.findMany({
+  return prisma.review.findMany({
     where: {
       type: "ORGANIZER",
       order: {
@@ -147,16 +130,15 @@ export const getOrganizerReviewsService = async (organizationId: number) => {
     },
     include: {
       order: {
-        include: {
+        select: {
           user: {
             select: {
               id: true,
               name: true,
-              picture: true,
             },
           },
           ticket: {
-            include: {
+            select: {
               event: {
                 select: {
                   id: true,
@@ -172,26 +154,4 @@ export const getOrganizerReviewsService = async (organizationId: number) => {
       createdAt: "desc",
     },
   });
-
-  const totalReviews = reviews.length;
-
-  const averageRating =
-    totalReviews === 0
-      ? 0
-      : reviews.reduce((total, review) => total + review.rating, 0) /
-        totalReviews;
-
-  return {
-    averageRating: Number(averageRating.toFixed(1)),
-    totalReviews,
-    reviews: reviews.map((review) => ({
-      id: review.id,
-      rating: review.rating,
-      title: review.title,
-      comment: review.comment,
-      createdAt: review.createdAt,
-      user: review.order.user,
-      event: review.order.ticket.event,
-    })),
-  };
 };

@@ -3,12 +3,16 @@ import { prisma } from "../lib/prisma.js";
 
 export const expiredTransactionCron = () => {
   cron.schedule("* * * * *", async () => {
+    console.log("Checking for expired transactions...");
+
+    const now = new Date();
+
     try {
       const expiredOrders = await prisma.order.findMany({
         where: {
           paymentStatus: "WAITING_FOR_PAYMENT",
           expiresAt: {
-            lte: new Date(),
+            lte: now,
           },
         },
         select: {
@@ -18,14 +22,13 @@ export const expiredTransactionCron = () => {
 
       for (const order of expiredOrders) {
         await prisma.$transaction(async (tx) => {
-          // Only process an order if it is still unpaid and expired.
-          // This prevents two cron executions from restoring resources twice.
-          const updated = await tx.order.updateMany({
+          // Prevent the same order from being processed twice.
+          const updatedOrder = await tx.order.updateMany({
             where: {
               id: order.id,
               paymentStatus: "WAITING_FOR_PAYMENT",
               expiresAt: {
-                lte: new Date(),
+                lte: now,
               },
             },
             data: {
@@ -33,22 +36,19 @@ export const expiredTransactionCron = () => {
             },
           });
 
-          if (updated.count === 0) {
+          // If another process already handled this order, skip it.
+          if (updatedOrder.count === 0) {
             return;
           }
 
-          const expiredOrder = await tx.order.findUnique({
-            where: { id: order.id },
-            include: {
-              pointUsages: true,
+          // Retrieve the order details needed to restore its ticket stock.
+          const expiredOrder = await tx.order.findUniqueOrThrow({
+            where: {
+              id: order.id,
             },
           });
 
-          if (!expiredOrder) {
-            throw new Error(`Order ${order.id} not found`);
-          }
-
-          // 1. Restore ticket stock.
+          // Return the reserved tickets.
           await tx.ticket.update({
             where: {
               id: expiredOrder.ticketId,
@@ -60,37 +60,40 @@ export const expiredTransactionCron = () => {
             },
           });
 
-          // 2. Restore the exact points used by this order.
-          for (const usage of expiredOrder.pointUsages) {
-            await tx.point.update({
-              where: {
-                id: usage.pointId,
-              },
-              data: {
-                amount: {
-                  increment: usage.amount,
+          // Find the points used for this order.
+          const pointUsages = await tx.pointUsage.findMany({
+            where: {
+              orderId: expiredOrder.id,
+            },
+            include: {
+              point: true,
+            },
+          });
+
+          // Restore points only if their original expiry date
+          // has not passed.
+          for (const usage of pointUsages) {
+            if (usage.point.expiresAt > now) {
+              await tx.point.update({
+                where: {
+                  id: usage.pointId,
                 },
-              },
-            });
+                data: {
+                  amount: {
+                    increment: usage.amount,
+                  },
+                },
+              });
+            }
           }
 
-          // 3. Make the coupon usable again, if this order used one.
-          if (expiredOrder.couponId !== null) {
-            await tx.coupon.update({
-              where: {
-                id: expiredOrder.couponId,
-              },
-              data: {
-                isUsed: false,
-              },
-            });
-          }
-
-          console.log(`Order ${order.id} expired and resources restored.`);
+          console.log(`Order ${expiredOrder.id} expired successfully.`);
         });
       }
     } catch (error) {
-      console.error("Failed to expire unpaid orders:", error);
+      console.error("Error while expiring transactions:", error);
     }
   });
+
+  console.log("Transaction expiration cron job started.");
 };

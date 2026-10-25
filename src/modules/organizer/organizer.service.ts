@@ -333,3 +333,21 @@ export async function getEventAttendees(userId: number, eventId: number) {
     attendees,
   };
 }
+
+export async function getMyOrganization(userId: number) {
+  const organization = await prisma.organization.findUnique({
+    where: {
+      userId,
+    },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+
+  if (!organization) {
+    throw new ApiError("Organization not found", 404);
+  }
+
+  return organization;
+}
