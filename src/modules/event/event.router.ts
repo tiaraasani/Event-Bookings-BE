@@ -10,7 +10,7 @@ import {
 } from "./event.controller.js";
 import { validate } from "../../middlewares/validate.js";
 import { authenticate } from "../../middlewares/auth.js";
-import { upload } from "../../middlewares/upload.js";
+import { fileFilter, upload } from "../../middlewares/upload.js";
 import { createEventSchema, updateEventSchema } from "./event.validation.js";
 
 const router = Router();
@@ -64,6 +64,9 @@ router.patch(
   "/:id",
   authenticate,
   requireOrganizer,
+  upload().fields([{ name: "image", maxCount: 1 }]),
+  fileFilter(["image/jpeg", "image/png", "image/webp", "image/avif"]),
+  parseEventFormData,
   validate(updateEventSchema),
   updateEventController,
 );

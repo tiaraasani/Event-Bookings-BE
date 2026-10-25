@@ -1,8 +1,21 @@
 import * as organizerService from "./organizer.service";
 import { Request, Response } from "express";
+import { PaymentStatus } from "../../generated/prisma/client";
 
 export async function getTransactions(req: Request, res: Response) {
-  const result = await organizerService.getTransactions(req.user!.id);
+  const query = {
+    page: parseInt(req.query.page as string) || 1,
+    take: parseInt(req.query.take as string) || 10,
+    sortOrder: (req.query.sortOrder as string) || "desc",
+    sortBy: (req.query.sortBy as string) || "createdAt",
+    search: (req.query.search as string) || "",
+    status: Object.values(PaymentStatus).includes(
+      req.query.status as PaymentStatus,
+    )
+      ? (req.query.status as PaymentStatus)
+      : undefined,
+  };
+  const result = await organizerService.getTransactions(req.user!.id, query);
   res.status(200).json(result);
 }
 

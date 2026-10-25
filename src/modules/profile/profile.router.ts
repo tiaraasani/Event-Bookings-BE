@@ -6,7 +6,7 @@ import {
   updateProfileSchema,
   changePasswordSchema,
 } from "./profile.validation";
-import { upload } from "../../middlewares/upload";
+import { fileFilter, upload } from "../../middlewares/upload";
 
 const router = Router();
 router.use(authenticate);
@@ -25,6 +25,7 @@ router.patch(
 router.patch(
   "/picture",
   upload().fields([{ name: "picture", maxCount: 1 }]),
+  fileFilter(["image/jpeg", "image/png", "image/webp", "image/avif"]),
   profileController.updatePicture,
 );
 
