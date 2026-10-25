@@ -10,5 +10,6 @@ router.patch("/transactions/:id/accept", organizerController.acceptTransaction);
 router.patch("/transactions/:id/reject", organizerController.rejectTransaction);
 router.get("/statistics", organizerController.getStatistics);
 router.get("/events/:id/attendees", organizerController.getEventAttendees);
+router.get("/organization", organizerController.getMyOrganization);
 
 export default router;

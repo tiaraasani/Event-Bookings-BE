@@ -9,13 +9,23 @@ import transactionRouter from "./modules/transaction/transaction.router";
 import organizerRouter from "./modules/organizer/organizer.router";
 import reviewRoutes from "./modules/review/review.router.js";
 import { expiredTransactionCron } from "./script/transaction.js";
+import voucherRoutes from "./modules/voucher/voucher.router.js";
 
 dotenv.config();
+
+console.log("DATABASE_URL loaded:", !!process.env.DATABASE_URL);
+console.log("JWT_SECRET loaded:", !!process.env.JWT_SECRET);
+console.log("PORT:", process.env.PORT);
 
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  }),
+);
 app.use(express.json());
 
 app.use("/api/auth", authRouter);
@@ -24,6 +34,7 @@ app.use("/api/events", eventRouter);
 app.use("/api/transactions", transactionRouter);
 app.use("/api/organizer", organizerRouter);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/vouchers", voucherRoutes);
 
 expiredTransactionCron();
 

@@ -41,3 +41,8 @@ export async function getEventAttendees(req: Request, res: Response) {
   );
   res.status(200).json(result);
 }
+
+export async function getMyOrganization(req: Request, res: Response) {
+  const result = await organizerService.getMyOrganization(req.user!.id);
+  res.status(200).json(result);
+}

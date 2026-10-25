@@ -1,9 +1,11 @@
+import type { Request, Response, NextFunction } from "express";
+import { ApiError } from "../../utils/api-error.js";
 import {
   createReviewService,
   getEventReviewsService,
-  getOrganizerReviewsService,
+  getOrganizationReviewsService,
 } from "./review.service.js";
-import type { Request, Response, NextFunction } from "express";
+import { createReviewSchema } from "./review.validation.js";
 
 export const createReviewController = async (
   req: Request,
@@ -11,10 +13,19 @@ export const createReviewController = async (
   next: NextFunction,
 ) => {
   try {
-    const result = await createReviewService(req.user!.id, req.body);
+    const parsed = createReviewSchema.safeParse(req.body);
 
-    res.status(201).json({
-      message: "Review created successfully",
+    if (!parsed.success) {
+      throw new ApiError(
+        parsed.error.issues[0]?.message || "Invalid review data",
+        400,
+      );
+    }
+
+    const result = await createReviewService(req.user!.id, parsed.data);
+
+    res.status(201).send({
+      message: "Review submitted successfully",
       data: result,
     });
   } catch (error) {
@@ -31,12 +42,12 @@ export const getEventReviewsController = async (
     const eventId = Number(req.params.eventId);
 
     if (!Number.isInteger(eventId) || eventId <= 0) {
-      throw new Error("Invalid event ID");
+      throw new ApiError("Invalid event ID", 400);
     }
 
     const result = await getEventReviewsService(eventId);
 
-    res.status(200).json({
+    res.status(200).send({
       message: "Event reviews retrieved successfully",
       data: result,
     });
@@ -45,7 +56,7 @@ export const getEventReviewsController = async (
   }
 };
 
-export const getOrganizerReviewsController = async (
+export const getOrganizationReviewsController = async (
   req: Request,
   res: Response,
   next: NextFunction,
@@ -54,12 +65,12 @@ export const getOrganizerReviewsController = async (
     const organizationId = Number(req.params.organizationId);
 
     if (!Number.isInteger(organizationId) || organizationId <= 0) {
-      throw new Error("Invalid organization ID");
+      throw new ApiError("Invalid organization ID", 400);
     }
 
-    const result = await getOrganizerReviewsService(organizationId);
+    const result = await getOrganizationReviewsService(organizationId);
 
-    res.status(200).json({
+    res.status(200).send({
       message: "Organizer reviews retrieved successfully",
       data: result,
     });

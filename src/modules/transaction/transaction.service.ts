@@ -11,9 +11,7 @@ export const createTransactionService = async (
   return prisma.$transaction(async (tx) => {
     const ticket = await tx.ticket.findUnique({
       where: { id: data.ticketId },
-      include: {
-        event: true,
-      },
+      include: { event: true },
     });
 
     if (!ticket || ticket.event.deletedAt !== null) {
@@ -30,24 +28,60 @@ export const createTransactionService = async (
 
     const total = ticket.price * data.quantity;
     const pointsToUse = data.pointsToUse ?? 0;
+    const now = new Date();
 
-    if (pointsToUse > total) {
-      throw new ApiError("Points cannot exceed the total ticket price", 400);
+    let voucherId: number | null = null;
+    let voucherDiscount = 0;
+
+    if (data.voucherCode) {
+      const voucher = await tx.voucher.findUnique({
+        where: {
+          code: data.voucherCode.trim().toUpperCase(),
+        },
+      });
+
+      if (!voucher) {
+        throw new ApiError("Invalid voucher code", 400);
+      }
+
+      if (voucher.eventId !== ticket.eventId) {
+        throw new ApiError("This voucher is not valid for this event", 400);
+      }
+
+      if (now < voucher.startDate || now > voucher.endDate) {
+        throw new ApiError("This voucher is not currently valid", 400);
+      }
+
+      const usedQuota = await tx.order.count({
+        where: {
+          voucherId: voucher.id,
+        },
+      });
+
+      if (usedQuota >= voucher.quota) {
+        throw new ApiError("This voucher has reached its quota", 400);
+      }
+
+      voucherId = voucher.id;
+      voucherDiscount = Math.floor((total * voucher.discountValue) / 100);
+    }
+
+    const totalAfterVoucher = total - voucherDiscount;
+
+    if (pointsToUse > totalAfterVoucher) {
+      throw new ApiError(
+        "Points cannot exceed the ticket total after voucher discount",
+        400,
+      );
     }
 
     const pointRecords = await tx.point.findMany({
       where: {
         userId,
-        expiresAt: {
-          gt: new Date(),
-        },
-        amount: {
-          gt: 0,
-        },
+        expiresAt: { gt: now },
+        amount: { gt: 0 },
       },
-      orderBy: {
-        expiresAt: "asc",
-      },
+      orderBy: { expiresAt: "asc" },
     });
 
     const availablePoints = pointRecords.reduce(
@@ -62,14 +96,10 @@ export const createTransactionService = async (
     const stockUpdate = await tx.ticket.updateMany({
       where: {
         id: data.ticketId,
-        availableQuantity: {
-          gte: data.quantity,
-        },
+        availableQuantity: { gte: data.quantity },
       },
       data: {
-        availableQuantity: {
-          decrement: data.quantity,
-        },
+        availableQuantity: { decrement: data.quantity },
       },
     });
 
@@ -79,15 +109,19 @@ export const createTransactionService = async (
 
     const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
 
+    const totalDiscount = voucherDiscount + pointsToUse;
+    const finalPrice = total - totalDiscount;
+
     const order = await tx.order.create({
       data: {
         userId,
         ticketId: ticket.id,
         quantity: data.quantity,
         total,
+        voucherId,
         pointsUsed: pointsToUse,
-        discount: pointsToUse,
-        finalPrice: total - pointsToUse,
+        discount: totalDiscount,
+        finalPrice,
         paymentStatus: PaymentStatus.WAITING_FOR_PAYMENT,
         expiresAt,
       },
@@ -103,9 +137,7 @@ export const createTransactionService = async (
       await tx.point.update({
         where: { id: point.id },
         data: {
-          amount: {
-            decrement: amountToUse,
-          },
+          amount: { decrement: amountToUse },
         },
       });
 
@@ -124,10 +156,9 @@ export const createTransactionService = async (
       where: { id: order.id },
       include: {
         ticket: {
-          include: {
-            event: true,
-          },
+          include: { event: true },
         },
+        voucher: true,
         pointUsages: true,
       },
     });

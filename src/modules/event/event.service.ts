@@ -94,9 +94,6 @@ export const getEventsService = async () => {
   const events = await prisma.event.findMany({
     where: {
       deletedAt: null,
-      endDate: {
-        gt: new Date(),
-      },
     },
     include: {
       category: true,
@@ -135,12 +132,13 @@ export const getEventByIdService = async (id: number) => {
     },
   });
 
-  if (!event || event.deletedAt !== null || event.endDate <= new Date()) {
+  if (!event || event.deletedAt !== null) {
     throw new ApiError("Event not found", 404);
   }
 
   return event;
 };
+
 export const updateEventService = async (
   userId: number,
   id: number,
