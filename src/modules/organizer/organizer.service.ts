@@ -59,15 +59,18 @@ function emptyRows(labels: string[]): StatRow[] {
 
 export async function getTransactions(
   userId: number,
-  query: PaginationQueryParams & { status?: PaymentStatus },
+  query: PaginationQueryParams & { status?: PaymentStatus; eventId?: number },
 ) {
-  const { page, take, sortBy, sortOrder, search, status } = query;
+  const { page, take, sortBy, sortOrder, search, status, eventId } = query;
   const organization = await getOrganization(userId);
 
   const whereClause: Prisma.OrderWhereInput = {
     ticket: {
       event: {
         organizationId: organization.id,
+        // The organization check above means an organizer can only ever
+        // filter by their own events.
+        ...(eventId ? { id: eventId } : {}),
       },
     },
   };
@@ -294,7 +297,11 @@ export async function getStatistics(
 
   return { year, month, summary, byYear, byMonth, byDay };
 }
-export async function getEventAttendees(userId: number, eventId: number) {
+export async function getEventAttendees(
+  userId: number,
+  eventId: number,
+  query: { page: number; take: number },
+) {
   const organization = await getOrganization(userId);
 
   const event = await prisma.event.findFirst({
@@ -314,13 +321,24 @@ export async function getEventAttendees(userId: number, eventId: number) {
     throw new ApiError("Event not found", 404);
   }
 
-  const orders = await prisma.order.findMany({
-    where: {
-      paymentStatus: "PAID",
-      ticket: {
-        eventId: event.id,
-      },
+  const whereClause = {
+    paymentStatus: "PAID" as const,
+    ticket: {
+      eventId: event.id,
     },
+  };
+
+  // Summary covers every paid order, not just the current page
+  const totals = await prisma.order.aggregate({
+    where: whereClause,
+    _count: { id: true },
+    _sum: { quantity: true, finalPrice: true },
+  });
+
+  const orders = await prisma.order.findMany({
+    where: whereClause,
+    skip: (query.page - 1) * query.take,
+    take: query.take,
     include: {
       user: {
         select: { name: true, email: true },
@@ -344,21 +362,19 @@ export async function getEventAttendees(userId: number, eventId: number) {
     paidAt: order.paidAt,
   }));
 
-  let totalTickets = 0;
-  let totalRevenue = 0;
-  for (const attendee of attendees) {
-    totalTickets += attendee.quantity;
-    totalRevenue += attendee.totalPaid;
-  }
-
   return {
     event,
     summary: {
-      totalAttendees: attendees.length,
-      totalTickets,
-      totalRevenue,
+      totalAttendees: totals._count.id,
+      totalTickets: totals._sum.quantity ?? 0,
+      totalRevenue: totals._sum.finalPrice ?? 0,
     },
     attendees,
+    meta: {
+      page: query.page,
+      take: query.take,
+      total: totals._count.id,
+    },
   };
 }
 

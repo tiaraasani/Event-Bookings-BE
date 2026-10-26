@@ -68,9 +68,38 @@ export const createTransactionService = async (
 
     const totalAfterVoucher = total - voucherDiscount;
 
-    if (pointsToUse > totalAfterVoucher) {
+    // Coupon: a system reward (from referral) that belongs to this user and
+    // works on any event. Applied after the voucher, before points.
+    let couponId: number | null = null;
+    let couponDiscount = 0;
+
+    if (data.couponCode) {
+      const coupon = await tx.coupon.findUnique({
+        where: { code: data.couponCode.trim().toUpperCase() },
+      });
+
+      if (!coupon || coupon.userId !== userId) {
+        throw new ApiError("Invalid coupon code", 400);
+      }
+
+      if (coupon.isUsed) {
+        throw new ApiError("This coupon has already been used", 400);
+      }
+
+      if (coupon.expiresAt <= now) {
+        throw new ApiError("This coupon has expired", 400);
+      }
+
+      couponId = coupon.id;
+      // A coupon can never push the price below zero.
+      couponDiscount = Math.min(coupon.discountValue, totalAfterVoucher);
+    }
+
+    const totalAfterDiscounts = totalAfterVoucher - couponDiscount;
+
+    if (pointsToUse > totalAfterDiscounts) {
       throw new ApiError(
-        "Points cannot exceed the ticket total after voucher discount",
+        "Points cannot exceed the ticket total after voucher and coupon discounts",
         400,
       );
     }
@@ -109,7 +138,7 @@ export const createTransactionService = async (
 
     const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
 
-    const totalDiscount = voucherDiscount + pointsToUse;
+    const totalDiscount = voucherDiscount + couponDiscount + pointsToUse;
     const finalPrice = total - totalDiscount;
 
     const order = await tx.order.create({
@@ -119,6 +148,7 @@ export const createTransactionService = async (
         quantity: data.quantity,
         total,
         voucherId,
+        couponId,
         pointsUsed: pointsToUse,
         discount: totalDiscount,
         finalPrice,
@@ -126,6 +156,15 @@ export const createTransactionService = async (
         expiresAt,
       },
     });
+
+    // Mark the coupon as used so it cannot be applied to another order.
+    // It is released again if the order is rejected, expired, or canceled.
+    if (couponId) {
+      await tx.coupon.update({
+        where: { id: couponId },
+        data: { isUsed: true },
+      });
+    }
 
     let remainingPoints = pointsToUse;
 
@@ -159,6 +198,7 @@ export const createTransactionService = async (
           include: { event: true },
         },
         voucher: true,
+        coupon: true,
         pointUsages: true,
       },
     });

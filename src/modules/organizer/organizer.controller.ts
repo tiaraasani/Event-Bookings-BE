@@ -14,6 +14,9 @@ export async function getTransactions(req: Request, res: Response) {
     )
       ? (req.query.status as PaymentStatus)
       : undefined,
+    // Optional: only orders for one of the organizer's events
+    eventId:
+      Number(req.query.eventId) > 0 ? Number(req.query.eventId) : undefined,
   };
   const result = await organizerService.getTransactions(req.user!.id, query);
   res.status(200).json(result);
@@ -51,6 +54,10 @@ export async function getEventAttendees(req: Request, res: Response) {
   const result = await organizerService.getEventAttendees(
     req.user!.id,
     Number(req.params.id),
+    {
+      page: parseInt(req.query.page as string) || 1,
+      take: parseInt(req.query.take as string) || 10,
+    },
   );
   res.status(200).json(result);
 }
