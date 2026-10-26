@@ -68,8 +68,6 @@ export async function getTransactions(
     ticket: {
       event: {
         organizationId: organization.id,
-        // The organization check above means an organizer can only ever
-        // filter by their own events.
         ...(eventId ? { id: eventId } : {}),
       },
     },
@@ -328,7 +326,6 @@ export async function getEventAttendees(
     },
   };
 
-  // Summary covers every paid order, not just the current page
   const totals = await prisma.order.aggregate({
     where: whereClause,
     _count: { id: true },

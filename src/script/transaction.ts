@@ -87,8 +87,6 @@ export const expiredTransactionCron = () => {
             }
           }
 
-          // Release the coupon so it can be used on another order,
-          // as long as the coupon itself has not expired.
           if (expiredOrder.couponId) {
             await tx.coupon.updateMany({
               where: {

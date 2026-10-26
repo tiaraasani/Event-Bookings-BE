@@ -68,8 +68,6 @@ export const createTransactionService = async (
 
     const totalAfterVoucher = total - voucherDiscount;
 
-    // Coupon: a system reward (from referral) that belongs to this user and
-    // works on any event. Applied after the voucher, before points.
     let couponId: number | null = null;
     let couponDiscount = 0;
 
@@ -91,7 +89,6 @@ export const createTransactionService = async (
       }
 
       couponId = coupon.id;
-      // A coupon can never push the price below zero.
       couponDiscount = Math.min(coupon.discountValue, totalAfterVoucher);
     }
 
@@ -157,8 +154,6 @@ export const createTransactionService = async (
       },
     });
 
-    // Mark the coupon as used so it cannot be applied to another order.
-    // It is released again if the order is rejected, expired, or canceled.
     if (couponId) {
       await tx.coupon.update({
         where: { id: couponId },

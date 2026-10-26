@@ -14,7 +14,6 @@ export async function getTransactions(req: Request, res: Response) {
     )
       ? (req.query.status as PaymentStatus)
       : undefined,
-    // Optional: only orders for one of the organizer's events
     eventId:
       Number(req.query.eventId) > 0 ? Number(req.query.eventId) : undefined,
   };
