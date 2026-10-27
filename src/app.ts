@@ -20,9 +20,13 @@ console.log("PORT:", process.env.PORT);
 const app = express();
 // const PORT = process.env.PORT || 8000;
 
+const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173")
+  .split(",")
+  .map((o) => o.trim());
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: allowedOrigins,
     credentials: true,
   }),
 );
@@ -36,7 +40,9 @@ app.use("/api/organizer", organizerRouter);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/vouchers", voucherRoutes);
 
-expiredTransactionCron();
+if (process.env.NODE_ENV !== "test") {
+  expiredTransactionCron();
+}
 
 app.get("/", (_req, res) => {
   res.json({ message: "API running" });

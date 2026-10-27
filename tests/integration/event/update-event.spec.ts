@@ -673,7 +673,7 @@ describe("PATCH /events/:id", () => {
     // Assert
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
-      message: "End date must be after start date",
+      message: "endDate: End date must be after start date",
     });
 
     const savedEvent = await prisma.event.findUniqueOrThrow({

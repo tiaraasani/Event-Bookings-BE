@@ -818,7 +818,7 @@ describe("POST /transactions", () => {
     // Assert
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
-      message: "Points cannot exceed the ticket total after voucher discount",
+      message: "Points cannot exceed the ticket total after voucher and coupon discounts",
     });
 
     const savedPoint = await prisma.point.findUniqueOrThrow({

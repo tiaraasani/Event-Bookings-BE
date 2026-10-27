@@ -84,7 +84,6 @@ export const updateEventController = async (
       throw new ApiError("Invalid event ID", 400);
     }
 
-    const result = await updateEventService(req.user!.id, id, req.body);
     const files = req.files as
       | { [fieldname: string]: Express.Multer.File[] }
       | undefined;
@@ -93,7 +92,7 @@ export const updateEventController = async (
 
     const result = await updateEventService(
       req.user!.id,
-      Number(req.params.id),
+      id,
       req.body,
       imageFile,
     );

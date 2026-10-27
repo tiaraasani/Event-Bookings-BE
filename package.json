@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "postinstall": "prisma generate",
     "test": "jest",
-    "test:integration": "vitest run --maxWorkers=1"
+    "test:integration": "vitest run --maxWorkers=1",
+    "copy-files": "node -e \"require('fs').cpSync('src/templates', 'src/templates', { recursive: true });\""
   },
   "keywords": [],
   "author": "",
