@@ -78,11 +78,13 @@ export const updateEventController = async (
   next: NextFunction,
 ) => {
   try {
-    const result = await updateEventService(
-      req.user!.id,
-      Number(req.params.id),
-      req.body,
-    );
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new ApiError("Invalid event ID", 400);
+    }
+
+    const result = await updateEventService(req.user!.id, id, req.body);
 
     res.status(200).send({
       message: "Event updated successfully",

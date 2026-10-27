@@ -130,7 +130,7 @@ export async function forgotPassword(input: ForgotPasswordInput) {
 
   if (!user) {
     return {
-      message: "If the emais is registered, a reset link has been sent",
+      message: "If the email is registered, a reset link has been sent",
     };
   }
 

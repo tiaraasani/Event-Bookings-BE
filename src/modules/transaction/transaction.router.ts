@@ -7,6 +7,7 @@ import {
   createTransactionController,
   getMyPointBalanceController,
   getMyTransactionsController,
+  getTransactionByIdController,
 } from "./transaction.controller";
 import { uploadPaymentProofController } from "./transaction.controller";
 import { upload } from "../../middlewares/upload";
@@ -41,6 +42,13 @@ router.get(
   authenticate,
   authorize(Role.CUSTOMER),
   getMyPointBalanceController,
+);
+
+router.get(
+  "/:id",
+  authenticate,
+  authorize(Role.CUSTOMER),
+  getTransactionByIdController,
 );
 
 export default router;

@@ -1,8 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
+import { ApiError } from "../../utils/api-error.js";
 import {
   createTransactionService,
   getMyPointBalanceService,
   getMyTransactionsService,
+  getTransactionByIdService,
   uploadPaymentProofService,
 } from "./transaction.service.js";
 
@@ -64,6 +66,29 @@ export const getMyTransactionsController = async (
 
     res.status(200).json({
       message: "Transactions retrieved successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getTransactionByIdController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new ApiError("Invalid transaction ID", 400);
+    }
+
+    const result = await getTransactionByIdService(req.user!.id, id);
+
+    res.status(200).json({
+      message: "Transaction retrieved successfully",
       data: result,
     });
   } catch (error) {

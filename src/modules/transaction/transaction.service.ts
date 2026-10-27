@@ -229,6 +229,39 @@ export const getMyTransactionsService = async (userId: number) => {
   return transactions;
 };
 
+export const getTransactionByIdService = async (
+  userId: number,
+  orderId: number,
+) => {
+  const transaction = await prisma.order.findFirst({
+    where: {
+      id: orderId,
+      userId,
+    },
+    include: {
+      ticket: {
+        include: {
+          event: {
+            include: {
+              category: true,
+              organization: true,
+            },
+          },
+        },
+      },
+      coupon: true,
+      voucher: true,
+      pointUsages: true,
+    },
+  });
+
+  if (!transaction) {
+    throw new ApiError("Transaction not found", 404);
+  }
+
+  return transaction;
+};
+
 export const getMyPointBalanceService = async (userId: number) => {
   const points = await prisma.point.findMany({
     where: {

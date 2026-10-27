@@ -149,8 +149,19 @@ export const updateEventService = async (
     where: { id },
   });
 
-  if (!event || event.organizationId !== organization.id) {
+  if (
+    !event ||
+    event.deletedAt !== null ||
+    event.organizationId !== organization.id
+  ) {
     throw new ApiError("Event not found", 404);
+  }
+
+  const startDate = data.startDate ?? event.startDate;
+  const endDate = data.endDate ?? event.endDate;
+
+  if (endDate <= startDate) {
+    throw new ApiError("End date must be after start date", 400);
   }
 
   const updatedEvent = await prisma.event.update({
