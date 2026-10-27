@@ -87,6 +87,16 @@ export const expiredTransactionCron = () => {
             }
           }
 
+          if (expiredOrder.couponId) {
+            await tx.coupon.updateMany({
+              where: {
+                id: expiredOrder.couponId,
+                expiresAt: { gt: now },
+              },
+              data: { isUsed: false },
+            });
+          }
+
           console.log(`Order ${expiredOrder.id} expired successfully.`);
         });
       }

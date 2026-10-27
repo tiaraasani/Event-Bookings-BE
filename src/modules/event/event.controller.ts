@@ -85,6 +85,18 @@ export const updateEventController = async (
     }
 
     const result = await updateEventService(req.user!.id, id, req.body);
+    const files = req.files as
+      | { [fieldname: string]: Express.Multer.File[] }
+      | undefined;
+
+    const imageFile = files?.image?.[0];
+
+    const result = await updateEventService(
+      req.user!.id,
+      Number(req.params.id),
+      req.body,
+      imageFile,
+    );
 
     res.status(200).send({
       message: "Event updated successfully",

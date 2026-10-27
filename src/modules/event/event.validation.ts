@@ -38,6 +38,7 @@ export const createEventSchema = z
 export const updateEventSchema = z
   .object({
     categoryId: z.coerce.number().int().positive().optional(),
+    customCategory: z.string().trim().optional(),
     name: z.string().min(3).optional(),
     description: z.string().optional(),
     city: z.string().min(2).optional(),
@@ -49,7 +50,15 @@ export const updateEventSchema = z
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field must be provided",
-  });
+  })
+  .refine(
+    (data) =>
+      !data.startDate || !data.endDate || data.endDate > data.startDate,
+    {
+      message: "End date must be after start date",
+      path: ["endDate"],
+    },
+  );
 
 export type UpdateEventSchema = z.infer<typeof updateEventSchema>;
 export type CreateEventSchema = z.infer<typeof createEventSchema>;

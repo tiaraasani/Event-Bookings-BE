@@ -1,6 +1,8 @@
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../utils/api-error";
 import { sendMail } from "../../lib/mail";
+import { PaymentStatus, Prisma } from "../../generated/prisma/client";
+import type { PaginationQueryParams } from "../../types/pagination";
 
 async function getOrganization(userId: number) {
   const organization = await prisma.organization.findUnique({
@@ -55,17 +57,39 @@ function emptyRows(labels: string[]): StatRow[] {
   return labels.map((label) => ({ label, tickets: 0, revenue: 0 }));
 }
 
-export async function getTransactions(userId: number) {
+export async function getTransactions(
+  userId: number,
+  query: PaginationQueryParams & { status?: PaymentStatus; eventId?: number },
+) {
+  const { page, take, sortBy, sortOrder, search, status, eventId } = query;
   const organization = await getOrganization(userId);
 
-  const orders = await prisma.order.findMany({
-    where: {
-      ticket: {
-        event: {
-          organizationId: organization.id,
-        },
+  const whereClause: Prisma.OrderWhereInput = {
+    ticket: {
+      event: {
+        organizationId: organization.id,
+        ...(eventId ? { id: eventId } : {}),
       },
     },
+  };
+
+  if (status) {
+    whereClause.paymentStatus = status;
+  }
+
+  if (search) {
+    whereClause.user = {
+      OR: [
+        { name: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+      ],
+    };
+  }
+
+  const orders = await prisma.order.findMany({
+    where: whereClause,
+    skip: (page - 1) * take,
+    take: take,
     include: {
       user: {
         select: { id: true, name: true, email: true },
@@ -79,11 +103,16 @@ export async function getTransactions(userId: number) {
       },
     },
     orderBy: {
-      createdAt: "desc",
+      [sortBy]: sortOrder,
     },
   });
 
-  return orders;
+  const total = await prisma.order.count({ where: whereClause });
+
+  return {
+    data: orders,
+    meta: { page, take, total },
+  };
 }
 
 export async function acceptTransaction(userId: number, orderId: number) {
@@ -266,7 +295,11 @@ export async function getStatistics(
 
   return { year, month, summary, byYear, byMonth, byDay };
 }
-export async function getEventAttendees(userId: number, eventId: number) {
+export async function getEventAttendees(
+  userId: number,
+  eventId: number,
+  query: { page: number; take: number },
+) {
   const organization = await getOrganization(userId);
 
   const event = await prisma.event.findFirst({
@@ -286,13 +319,23 @@ export async function getEventAttendees(userId: number, eventId: number) {
     throw new ApiError("Event not found", 404);
   }
 
-  const orders = await prisma.order.findMany({
-    where: {
-      paymentStatus: "PAID",
-      ticket: {
-        eventId: event.id,
-      },
+  const whereClause = {
+    paymentStatus: "PAID" as const,
+    ticket: {
+      eventId: event.id,
     },
+  };
+
+  const totals = await prisma.order.aggregate({
+    where: whereClause,
+    _count: { id: true },
+    _sum: { quantity: true, finalPrice: true },
+  });
+
+  const orders = await prisma.order.findMany({
+    where: whereClause,
+    skip: (query.page - 1) * query.take,
+    take: query.take,
     include: {
       user: {
         select: { name: true, email: true },
@@ -316,21 +359,19 @@ export async function getEventAttendees(userId: number, eventId: number) {
     paidAt: order.paidAt,
   }));
 
-  let totalTickets = 0;
-  let totalRevenue = 0;
-  for (const attendee of attendees) {
-    totalTickets += attendee.quantity;
-    totalRevenue += attendee.totalPaid;
-  }
-
   return {
     event,
     summary: {
-      totalAttendees: attendees.length,
-      totalTickets,
-      totalRevenue,
+      totalAttendees: totals._count.id,
+      totalTickets: totals._sum.quantity ?? 0,
+      totalRevenue: totals._sum.finalPrice ?? 0,
     },
     attendees,
+    meta: {
+      page: query.page,
+      take: query.take,
+      total: totals._count.id,
+    },
   };
 }
 
